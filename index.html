@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bullpen Dashboard — Connection Test</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    max-width: 420px;
+    margin: 40px auto;
+    padding: 0 16px;
+    color: #222;
+  }
+  h1 { font-size: 1.2rem; }
+  label { display: block; margin-top: 16px; font-size: 0.9rem; font-weight: 600; }
+  input {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    margin-top: 4px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    background: #2d6cdf;
+    color: white;
+    border: none;
+    border-radius: 6px;
+  }
+  button:disabled { background: #999; }
+  #status {
+    margin-top: 16px;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    display: none;
+  }
+  .ok { background: #e6f4ea; color: #137333; display: block !important; }
+  .err { background: #fce8e6; color: #c5221f; display: block !important; }
+  #lastValue {
+    margin-top: 24px;
+    font-size: 0.85rem;
+    color: #555;
+    border-top: 1px solid #eee;
+    padding-top: 12px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Bullpen Dashboard — Connection Test</h1>
+<p style="font-size:0.85rem; color:#666;">
+  This page is only a plumbing test: GitHub Pages → Apps Script → Google Sheet.
+  Not the real dashboard yet.
+</p>
+
+<label for="mga">MGA name (test)</label>
+<input id="mga" type="text" placeholder="e.g. Jake Yagjian" />
+
+<label for="testValue">Test number</label>
+<input id="testValue" type="number" placeholder="e.g. 1234" />
+
+<label for="initials">Your initials (submitting)</label>
+<input id="initials" type="text" placeholder="e.g. VS" maxlength="4" />
+
+<button id="submitBtn" onclick="submitTest()">Submit test value</button>
+
+<div id="status"></div>
+
+<div id="lastValue">Checking last saved value…</div>
+
+<script>
+  // PASTE YOUR APPS SCRIPT WEB APP URL BELOW (ends in /exec)
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbweAsriLGY8FnT4FLU8rJCb4QEU7VlLZxaSYVv9KuxKak0MNh7zEiuNUVja1JFZ6LtANA/exec";
+
+  async function loadLatest() {
+    const el = document.getElementById('lastValue');
+    try {
+      const res = await fetch(APPS_SCRIPT_URL);
+      const data = await res.json();
+      if (data.latest) {
+        el.textContent = `Last saved: ${data.latest.mga} = ${data.latest.testValue} (by ${data.latest.submittedBy}, ${data.latest.timestamp})`;
+      } else {
+        el.textContent = "No entries yet.";
+      }
+    } catch (err) {
+      el.textContent = "Could not reach backend yet (this is expected until the URL above is set).";
+    }
+  }
+
+  async function submitTest() {
+    const mga = document.getElementById('mga').value.trim();
+    const testValue = document.getElementById('testValue').value.trim();
+    const initials = document.getElementById('initials').value.trim();
+    const statusEl = document.getElementById('status');
+    const btn = document.getElementById('submitBtn');
+
+    if (!mga || !testValue || !initials) {
+      statusEl.className = 'err';
+      statusEl.textContent = 'Fill in all three fields before submitting.';
+      return;
+    }
+
+    btn.disabled = true;
+    statusEl.className = '';
+    statusEl.textContent = '';
+
+    try {
+      // Sent as text/plain on purpose — avoids a CORS preflight request,
+      // which Apps Script web apps don't handle well. The body is still JSON.
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ mga, testValue, submittedBy: initials })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        statusEl.className = 'ok';
+        statusEl.textContent = `Saved. Submitted by ${initials}.`;
+        loadLatest();
+      } else {
+        statusEl.className = 'err';
+        statusEl.textContent = 'Backend error: ' + (data.error || 'unknown');
+      }
+    } catch (err) {
+      statusEl.className = 'err';
+      statusEl.textContent = 'Could not reach backend: ' + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  loadLatest();
+</script>
+
+</body>
+</html>
